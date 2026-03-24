@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>殺せんせーの特別学習室</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .korosensei-face { transition: background-color 0.5s; }
+        .maru { color: #ff4d4d; font-size: 8rem; display: none; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .loading { animation: blink 1s infinite; }
+    </style>
+</head>
+<body class="bg-yellow-400 min-h-screen flex flex-col items-center p-4 font-bold text-slate-800">
+
+    <h1 class="text-2xl mb-4">3年E組 殺せんせーAI</h1>
+
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl border-4 border-slate-800 overflow-hidden flex flex-col">
+        <div id="face" class="h-64 korosensei-face bg-yellow-300 flex items-center justify-center relative">
+            <div id="eye-l" class="w-4 h-4 bg-black rounded-full mx-8"></div>
+            <div id="eye-r" class="w-4 h-4 bg-black rounded-full mx-8"></div>
+            <div id="status-mark" class="maru absolute italic">〇</div>
+        </div>
+
+        <div class="relative h-48 bg-black">
+            <video id="video" autoplay playsinline class="w-full h-full object-cover"></video>
+            <canvas id="canvas" class="hidden"></canvas>
+            <div class="absolute top-2 left-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded">生徒の表情を監視中...</div>
+        </div>
+
+        <div id="chat-log" class="h-40 overflow-y-auto p-4 bg-slate-50 text-sm border-t-2 border-slate-800">
+            <p class="text-blue-600">殺せんせー: ヌルフフフ！宿題を見せなさい、私の生徒さん！</p>
+        </div>
+
+        <div class="p-4 bg-white border-t-2 border-slate-800 flex flex-col gap-2">
+            <button onclick="checkHomework()" id="btn" class="bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl shadow-lg active:scale-95 transition-all">
+                📚 宿題をマッハでスキャン！
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- 設定：ここにあなたのAPIキーを入れてください ---
+        const API_KEY = "AIzaSyAeZSj9AKD3YaT-WhGe85eRhAIqONcXszs"; 
+        // ----------------------------------------------
+
+        const video = document.getElementById('video');
+        const chatLog = document.getElementById('chat-log');
+        const face = document.getElementById('face');
+
+        // カメラ起動
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => alert("カメラを許可してくださいねぇ"));
+
+        // 殺せんせーが喋る機能
+        function koroSpeak(text) {
+            const uttr = new SpeechSynthesisUtterance(text);
+            uttr.lang = "ja-JP";
+            uttr.pitch = 1.8; // 高めの声
+            uttr.rate = 1.2;  // 早口
+            window.speechSynthesis.speak(uttr);
+            
+            const p = document.createElement('p');
+            p.className = "text-blue-600 mt-2";
+            p.innerText = "殺せんせー: " + text;
+            chatLog.appendChild(p);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        // 宿題チェック（AI呼び出し）
+        window.checkHomework = async () => {
+            const btn = document.getElementById('btn');
+            btn.disabled = true;
+            btn.innerText = "分析中...";
+            face.style.backgroundColor = "#90ee90"; // ヒント中の緑色
+
+            // キャプチャ
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: "あなたは殺せんせーです。生徒がカメラに映した宿題を分析し、褒めてから、苦手そうな部分にマッハの速度でヒントを出してください。語尾は『〜ですねぇ』、笑い声は『ヌルフフフ』です。100文字以内で。" },
+                                { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+                            ]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiText = data.candidates[0].content.parts[0].text;
+                koroSpeak(aiText);
+                face.style.backgroundColor = "#fde047"; // 黄色に戻る
+            } catch (e) {
+                koroSpeak("おや、通信エラーですねぇ。やり直しなさい！");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "📚 宿題をマッハでスキャン！";
+            }
+        };
+    </script>
+</body>
+</html>
